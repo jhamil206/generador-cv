@@ -9,10 +9,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "html2pdf.js": "^0.14.0",
     "pinia": "^4.0.3",
     "vue": "^3.5.42"
   },
   "devDependencies": {
+    "@types/html2pdf.js": "^0.10.0",
     "@types/node": "^24.13.3",
     "@vitejs/plugin-vue": "^6.0.8",
     "@vue/tsconfig": "^0.9.1",
