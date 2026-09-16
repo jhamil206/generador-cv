@@ -34,8 +34,16 @@ export const useCvStore = defineStore('cv', {
     },
     skills: [] as string[],
     experiences: [] as Experience[],
-    education: [] as Education[]
+    education: [] as Education[],
+    languages: [] as string[], // Evita undefined si la plantilla busca idiomas
+    projects: [] as any[]      // Evita undefined si la plantilla busca proyectos
   }),
+
+  getters: {
+    // Alias para que la plantilla funcione tanto en singular como en plural
+    experience: (state) => state.experiences
+  },
+
   actions: {
     addSkill(skill: string) {
       const cleanSkill = skill.trim()

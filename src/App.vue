@@ -1,5 +1,23 @@
 <template>
-  <div class="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
+  <!-- Pantalla de Error si algo falla al renderizar -->
+  <div v-if="renderError" class="p-6 bg-red-950 text-red-100 min-h-screen font-mono text-sm flex flex-col items-center justify-center">
+    <div class="max-w-2xl w-full bg-red-900/40 border border-red-700/60 p-6 rounded-xl shadow-2xl">
+      <h1 class="text-xl font-bold mb-2 text-red-400 flex items-center gap-2">
+        <span>⚠️</span> Error de ejecución detectado
+      </h1>
+      <p class="text-xs text-red-300 mb-4">La aplicación no pudo cargar debido al siguiente error:</p>
+      <pre class="bg-black/60 p-4 rounded-lg text-red-200 text-xs overflow-x-auto whitespace-pre-wrap border border-red-800/50">{{ renderError }}</pre>
+      <button 
+        @click="renderError = null" 
+        class="mt-4 px-4 py-2 bg-red-700 hover:bg-red-600 text-white font-bold text-xs rounded-lg transition"
+      >
+        Reintentar Carga
+      </button>
+    </div>
+  </div>
+
+  <!-- Aplicación Principal -->
+  <div v-else class="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
     <!-- Navbar -->
     <header class="bg-slate-900 border-b border-slate-800 px-4 py-3 flex flex-wrap items-center justify-between gap-3 sticky top-0 z-50">
       <div class="flex items-center gap-3">
@@ -15,17 +33,17 @@
       <!-- Selector Plantillas -->
       <div class="flex items-center gap-1.5 overflow-x-auto py-1">
         <button 
-          v-for="template in templates" 
-          :key="template"
-          @click="cvStore.selectedTemplate = template"
-          :class="cvStore.selectedTemplate === template ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'"
-          class="px-3 py-1 rounded-lg text-xs font-medium transition whitespace-nowrap border border-slate-700/50"
+          v-for="templateName in templatesList" 
+          :key="templateName"
+          @click="cvStore.selectedTemplate = templateName"
+          :class="cvStore.selectedTemplate === templateName ? 'bg-indigo-600 text-white font-bold' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'"
+          class="px-3 py-1 rounded-lg text-xs transition whitespace-nowrap border border-slate-700/50"
         >
-          {{ template }}
+          {{ templateName }}
         </button>
       </div>
 
-      <!-- Boton Descargar PDF -->
+      <!-- Botón Descargar PDF Directo -->
       <button 
         @click="exportToPdf" 
         :disabled="isGeneratingPdf"
@@ -56,7 +74,7 @@
 
     <!-- Layout Principal -->
     <div class="flex-1 flex overflow-hidden relative">
-      <!-- Sidebar -->
+      <!-- Sidebar de Edición -->
       <aside 
         :class="[
           isSidebarOpen ? 'w-full md:w-[420px]' : 'w-0 hidden',
@@ -74,111 +92,78 @@
       >
         <div class="w-full max-w-[850px] bg-slate-900/40 p-2 sm:p-4 rounded-2xl border border-slate-800/80 shadow-2xl flex justify-center overflow-x-auto">
           
-          <!-- Contenedor Hoja A4 -->
-          <div id="cv-preview-container" class="bg-white text-slate-900 shadow-xl rounded sm:rounded-none w-[210mm] min-h-[297mm] p-8 box-border transform scale-[0.85] sm:scale-100 origin-top">
-            
-            <!-- Encabezado -->
-            <div class="border-b-2 border-slate-800 pb-6 mb-6 flex justify-between items-center gap-4">
-              <div>
-                <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight">
-                  {{ cvStore.personalData.firstName || 'Nombre' }} {{ cvStore.personalData.lastName || 'Apellido' }}
-                </h1>
-                <p class="text-lg font-semibold text-indigo-600 mt-1">
-                  {{ cvStore.personalData.title || 'Puesto Deseado' }}
-                </p>
-                <div class="text-xs text-slate-600 mt-2 flex flex-wrap gap-x-4 gap-y-1">
-                  <span v-if="cvStore.personalData.email">📧 {{ cvStore.personalData.email }}</span>
-                  <span v-if="cvStore.personalData.phone">📞 {{ cvStore.personalData.phone }}</span>
-                  <span v-if="cvStore.personalData.location">📍 {{ cvStore.personalData.location }}</span>
-                </div>
-              </div>
-              <div v-if="cvStore.showPhoto && cvStore.personalData.photo" class="shrink-0">
-                <img :src="cvStore.personalData.photo" class="w-24 h-24 rounded-full object-cover border-2 border-indigo-600 shadow" />
-              </div>
-            </div>
-
-            <!-- Perfil / Resumen -->
-            <div v-if="cvStore.personalData.summary" class="mb-6">
-              <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Perfil Profesional</h2>
-              <p class="text-sm text-slate-700 leading-relaxed">{{ cvStore.personalData.summary }}</p>
-            </div>
-
-            <!-- Experiencia -->
-            <div v-if="cvStore.experiences.length" class="mb-6">
-              <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 border-b border-slate-200 pb-1">Experiencia Laboral</h2>
-              <div class="space-y-3">
-                <div v-for="exp in cvStore.experiences" :key="exp.id">
-                  <div class="flex justify-between items-baseline">
-                    <h3 class="text-sm font-bold text-slate-800">{{ exp.role || 'Cargo' }}</h3>
-                    <span class="text-xs text-slate-500 font-medium">{{ exp.dates }}</span>
-                  </div>
-                  <p class="text-xs font-semibold text-indigo-600">{{ exp.company }} <span v-if="exp.location" class="text-slate-400">| {{ exp.location }}</span></p>
-                  <p class="text-xs text-slate-600 mt-1">{{ exp.description }}</p>
-                </div>
-              </div>
-            </div>
-
-            <!-- Educación -->
-            <div v-if="cvStore.education.length" class="mb-6">
-              <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 border-b border-slate-200 pb-1">Educación</h2>
-              <div class="space-y-3">
-                <div v-for="edu in cvStore.education" :key="edu.id">
-                  <div class="flex justify-between items-baseline">
-                    <h3 class="text-sm font-bold text-slate-800">
-                      {{ edu.degree || 'Grado Academicó' }} 
-                      <span v-if="edu.status" class="text-xs font-normal text-indigo-600 ml-1">({{ edu.status }})</span>
-                    </h3>
-                    <span class="text-xs text-slate-500 font-medium">{{ edu.dates }}</span>
-                  </div>
-                  <p class="text-xs text-slate-600">{{ edu.institution }} <span v-if="edu.location" class="text-slate-400">| {{ edu.location }}</span></p>
-                </div>
-              </div>
-            </div>
-
-            <!-- Habilidades -->
-            <div v-if="cvStore.skills.length">
-              <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-200 pb-1">Habilidades</h2>
-              <div class="flex flex-wrap gap-1.5">
-                <span v-for="(skill, i) in cvStore.skills" :key="i" class="bg-slate-100 text-slate-800 text-xs px-2.5 py-1 rounded font-medium">
-                  {{ skill }}
-                </span>
-              </div>
-            </div>
-
+          <!-- Contenedor Hoja A4 Exportable -->
+          <div id="cv-preview-container" class="bg-white text-slate-900 shadow-xl rounded sm:rounded-none w-[210mm] min-h-[297mm] box-border transform scale-[0.85] sm:scale-100 origin-top overflow-hidden">
+            <component :is="activeComponent" />
           </div>
+
         </div>
       </main>
     </div>
   </div>
 </template>
 
-<script setup>
-import { ref } from 'vue'
+<script setup lang="ts">
+import { ref, computed, onErrorCaptured } from 'vue'
 import { useCvStore } from './stores/cvStore'
 import CvForm from './components/forms/CvForm.vue'
-import html2pdf from 'html2pdf.js'
+
+import Template1 from './components/templates/Template1.vue'
+import Template2 from './components/templates/Template2.vue'
+import Template3 from './components/templates/Template3.vue'
+import Template4 from './components/templates/Template4.vue'
+import Template5 from './components/templates/Template5.vue'
+
+const renderError = ref<string | null>(null)
+
+// Captura errores durante la fase de renderizado
+onErrorCaptured((err: any) => {
+  console.error('Error capturado en App.vue:', err)
+  renderError.value = err?.stack || err?.message || String(err)
+  return false
+})
 
 const cvStore = useCvStore()
 const isSidebarOpen = ref(true)
 const mobileTab = ref('form')
 const isGeneratingPdf = ref(false)
 
-const templates = ['Plantilla 1', 'Plantilla 2', 'Plantilla 3', 'Plantilla 4', 'Plantilla 5']
+const templateComponents: Record<string, any> = {
+  'Plantilla 1': Template1,
+  'Plantilla 2': Template2,
+  'Plantilla 3': Template3,
+  'Plantilla 4': Template4,
+  'Plantilla 5': Template5,
+}
+
+const templatesList = Object.keys(templateComponents)
+
+const activeComponent = computed(() => {
+  return templateComponents[cvStore.selectedTemplate] || Template1
+})
 
 const exportToPdf = async () => {
   isGeneratingPdf.value = true
   const element = document.getElementById('cv-preview-container')
-  
-  const options = {
-    margin: 0,
-    filename: `CV_${cvStore.personalData.firstName || 'Mi'}_${cvStore.personalData.lastName || 'Curriculum'}.pdf`,
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-  }
+  if (!element) return
 
   try {
-    await html2pdf().set(options).from(element).save()
+    const html2pdfModule = await import('html2pdf.js')
+    const html2pdf = html2pdfModule.default || html2pdfModule
+
+    const options = {
+      margin: 0,
+      filename: `CV_${cvStore.personalData?.firstName || 'Mi'}_${cvStore.personalData?.lastName || 'Curriculum'}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    }
+
+    const pdfGenerator = typeof html2pdf === 'function' ? html2pdf : (html2pdf as any).default
+    await pdfGenerator().from(element).set(options).save()
+  } catch (error: any) {
+    console.error('Error generando PDF:', error)
+    alert('Error al generar PDF: ' + (error?.message || error))
   } finally {
     isGeneratingPdf.value = false
   }
